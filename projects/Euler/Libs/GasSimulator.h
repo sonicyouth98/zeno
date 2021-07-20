@@ -63,9 +63,9 @@ public:
     T P_amb;
     T gamma;
     // clamp data
-    T clamp_ratio = 1e-6;
-    T lowest_rho = 1.25e-6;
-    T lowest_int_e_by_rho = 2e-6;
+    T clamp_ratio = 1e-3;
+    T lowest_rho = 1.25e-3;
+    T lowest_int_e_by_rho = 2e-3;
     // control datas
     bool use_RK = true;
     bool high_order_Bspline = false;
@@ -112,9 +112,6 @@ public:
         gamma = gamma_;
         gas_assembler.gamma = gamma;
         solid_assembler.P_amb = P_amb;
-        //std::fill(field_helper.q.begin(), field_helper.q.end(), q_amb);
-        //std::fill(field_helper.q_backup.begin(), field_helper.q_backup.end(),
-        //q_amb);
         // threshold for clamping
         lowest_rho = clamp_ratio * q_amb(0);
         lowest_int_e_by_rho = clamp_ratio * int_e / q_amb(0);
@@ -128,18 +125,6 @@ public:
         coupling_sys_builder.dx = dx_;
     }
 
-    void prepare_final_dir(std::string raw_dir)
-    {
-        // append any information to the output dir
-        // append resolution
-        Array<int, dim, 1> extend = field_helper.grid.bbmax - field_helper.grid.bbmin;
-        output_directory = raw_dir;
-        for (int d = 0; d < dim; d++)
-            output_directory += "_" + std::to_string(extend(d));
-        output_directory += "/";
-
-        Bow::FileSystem::create_path(output_directory);
-    }
     solverControl<T, dim> getSolverControl()
     {
         solverControl<T, dim> _sc;
@@ -165,6 +150,7 @@ public:
         _sc.initialized = initialized;
         return _sc;
     }
+
     void setSolverControl(solverControl<T, dim>& _sc)
     {
         q_amb = _sc.q_amb;
@@ -188,33 +174,12 @@ public:
         a_ref = _sc.a_ref;
         initialized = _sc.initialized;
     }
+
+    // constructor
     GasSimulator(const T dx_, const Array<int, dim, 1> bbmin_,
         const Array<int, dim, 1> bbmax_,
         const Array<T, dim + 2, 1> q_amb_, FieldHelperDense<T, dim, StorageIndex, XFastestSweep>& _field_helper,
         const T gamma_ = 1.4,
-        const T CFL_ = 0.5)
-        : dx(dx_), field_helper(_field_helper), sys_builder(dx_), coupling_sys_builder(dx_), gamma(gamma_), CFL(CFL_)
-    {
-        set_ambient(q_amb_, gamma_);
-        // close the simd domain
-        field_helper.iterateGridSerial(
-            [&](const IV& I) {
-                StorageIndex idx = field_helper.grid[I].idx;
-                if ((I.array() - bbmin_ < 0).any() || (I.array() - bbmax_ >= 0).any())
-                    field_helper.cell_type[idx] = CellType::FREE;
-                else
-                    field_helper.cell_type[idx] = CellType::GAS;
-            },
-            2);
-        // initial backup
-        field_helper.cell_type_origin = field_helper.cell_type;
-        field_helper.cell_type_backup = field_helper.cell_type;
-    }
-    // constructor
-    GasSimulator(const T dx_, const Array<int, dim, 1> bbmin_,
-        const Array<int, dim, 1> bbmax_,
-        FieldHelperDense<T, dim, StorageIndex, XFastestSweep>& _field_helper,
-        const Array<T, dim + 2, 1> q_amb_, const T gamma_ = 1.4,
         const T CFL_ = 0.5)
         : dx(dx_), field_helper(_field_helper), sys_builder(dx_), coupling_sys_builder(dx_), gamma(gamma_), CFL(CFL_)
     {
@@ -267,7 +232,7 @@ public:
         Logging::info("dt_no_clamp ", dt);
         if (dt < dt_min) {
             Logging::error("too little dt ", dt);
-            exit(1); // I have no idea why it doesnot quit here
+            exit(1);
         }
         dt = std::min(std::max(dt_min, dt), dt_max);
         Logging::info("calculated dt for compressible flow ", dt);
@@ -353,26 +318,17 @@ public:
                     field_helper.moving_Yf_interfaces_override.push_back(
                         std::make_tuple(I, d, normal, vel));
                 }
-            }
-        }
-        {
-            // get the velocity at the outlets and inlets
-            field_helper.moving_Ys_interfaces_override.clear();
-            // currently we can just loop all the Yf
-            for (const auto& it_mark : field_helper.Bs_interfaces) {
-                auto [I, d, normal] = it_mark;
-                int IT = field_helper.interface_type(I)(d);
-                if (IT == InterfaceType::SOLID_FREE || IT == InterfaceType::SOLID_INLET) {
+                else if (IT == InterfaceType::SOLID_GAS) {
                     auto I_solid = I;
                     I_solid(d) -= 1;
                     T vel = field_helper.us[field_helper.grid[I_solid].idx](d);
-                    field_helper.moving_Ys_interfaces_override.push_back(
+                    field_helper.moving_Yf_interfaces_override.push_back(
                         std::make_tuple(I, d, normal, vel));
                 }
-                else if (IT == InterfaceType::FREE_SOLID || IT == InterfaceType::INLET_SOLID) {
+                else if (IT == InterfaceType::GAS_SOLID) {
                     auto I_solid = I;
                     T vel = field_helper.us[field_helper.grid[I_solid].idx](d);
-                    field_helper.moving_Ys_interfaces_override.push_back(
+                    field_helper.moving_Yf_interfaces_override.push_back(
                         std::make_tuple(I, d, normal, vel));
                 }
             }
@@ -424,34 +380,25 @@ public:
     void initialize() override
     {
         if (!initialized) {
-
-            // test once
-            Bow::Vector<int, dim> center_I = ((field_helper.grid.bbmin + field_helper.grid.bbmax) / 2).matrix();
-            float r = 20;
-            int extend = 0;
-            for (int i = field_helper.grid.bbmin(0) - extend; i < field_helper.grid.bbmax(0) + extend; i++)
-                for (int j = field_helper.grid.bbmin(1) - extend; j < field_helper.grid.bbmax(1) + extend; j++)
-                    for (int k = field_helper.grid.bbmin(2) - extend; k < field_helper.grid.bbmax(2) + extend;
-                         k++) {
-                        Bow::Vector<int, dim> I(i, j, k);
-                        if ((I - center_I).template cast<T>().norm() < r) {
-                            int idx = field_helper.grid[I].idx;
-                            field_helper.q[idx] *= 10;
-                        }
-                    }
-            // field_helper.iterateGridSerial([&](const Bow::Vector<int, dim>& I) {
-            //     if ((I - center_I).template cast<T>().norm() < r) {
-            //         int idx = field_helper.grid[I].idx;
-            //         field_helper.q[idx] *= 10;
-            //     }
-            // },0);
+            // // test once
+            // Bow::Vector<int, dim> center_I = ((field_helper.grid.bbmin + field_helper.grid.bbmax) / 2).matrix();
+            // float r = 20;
+            // int extend = 0;
+            // for (int i = field_helper.grid.bbmin(0) - extend; i < field_helper.grid.bbmax(0) + extend; i++)
+            //     for (int j = field_helper.grid.bbmin(1) - extend; j < field_helper.grid.bbmax(1) + extend; j++)
+            //         for (int k = field_helper.grid.bbmin(2) - extend; k < field_helper.grid.bbmax(2) + extend;
+            //              k++) {
+            //             Bow::Vector<int, dim> I(i, j, k);
+            //             if ((I - center_I).template cast<T>().norm() < r) {
+            //                 int idx = field_helper.grid[I].idx;
+            //                 field_helper.q[idx] *= 10;
+            //             }
+            //         }
             initialized = true;
         }
 
         mark_dof();
         convert_q_to_primitives();
-        int idx = field_helper.grid[Bow::Vector<int, dim>::Zero()].idx;
-        std::cout << "center q " << field_helper.q[idx] << std::endl;
         backup();
     }
 
@@ -476,93 +423,8 @@ public:
         convert_q_to_primitives();
         backup();
     }
-
-    void get_advanced_visual_attr()
-    {
-        // get schlieren
-        // TODO change the interpolation to WENO (consistent with simd)?
-        {
-            std::fill(field_helper.schlieren.begin(), field_helper.schlieren.end(),
-                TV::Zero());
-            field_helper.iterateGridSerial(
-                [&](const Vector<int, dim> I) {
-                    int idx = field_helper.grid[I].idx;
-                    TV grad_rho = TV::Zero();
-                    if (field_helper.cell_type[idx] == CellType::GAS) {
-                        T rho_c = field_helper.rhof[idx];
-                        for (int d = 0; d < dim; d++) {
-                            // look front
-                            Vector<int, dim> I_f = I;
-                            I_f(d) += 1;
-                            int idx_f = field_helper.grid[I_f].idx;
-                            T rho_f = (field_helper.cell_type[idx_f] == CellType::GAS
-                                    ? field_helper.rhof[idx_f]
-                                    : rho_c);
-                            // look back
-                            Vector<int, dim> I_b = I;
-                            I_b(d) -= 1;
-                            int idx_b = field_helper.grid[I_b].idx;
-                            T rho_b = (field_helper.cell_type[idx_b] == CellType::GAS
-                                    ? field_helper.rhof[idx_b]
-                                    : rho_c);
-                            // grad
-                            grad_rho(d) = (rho_f - rho_b) / 2 / dx;
-                        }
-                        field_helper.schlieren[idx] = grad_rho;
-                    }
-                },
-                0);
-        }
-        // get shawdow_graph
-        {
-            std::fill(field_helper.shawdow_graph.begin(),
-                field_helper.shawdow_graph.end(), 0);
-            field_helper.iterateGridSerial(
-                [&](const Vector<int, dim> I) {
-                    int idx = field_helper.grid[I].idx;
-                    if (field_helper.cell_type[idx] == CellType::GAS) {
-                        T rho_c = field_helper.rhof[idx];
-                        T laplacian_rho = -rho_c * (T)dim * 2;
-                        for (int d = 0; d < dim; d++) {
-                            // look front
-                            Vector<int, dim> I_f = I;
-                            I_f(d) += 1;
-                            int idx_f = field_helper.grid[I_f].idx;
-                            laplacian_rho += (field_helper.cell_type[idx_f] == CellType::GAS
-                                    ? field_helper.rhof[idx_f]
-                                    : rho_c);
-                            // look back
-                            Vector<int, dim> I_b = I;
-                            I_b(d) -= 1;
-                            int idx_b = field_helper.grid[I_b].idx;
-                            laplacian_rho += (field_helper.cell_type[idx_b] == CellType::GAS
-                                    ? field_helper.rhof[idx_b]
-                                    : rho_c);
-                        }
-                        laplacian_rho /= (dx * dx);
-                        field_helper.shawdow_graph[idx] = laplacian_rho;
-                    }
-                },
-                0);
-        }
-    }
-
-    virtual void dump_vtk(int frame_num)
-    {
-        return;
-    }
-
-    void dump_output(int frame_num) override
-    {
-        get_advanced_visual_attr();
-        BOW_TIMER_FLAG("IO");
-        std::string output_file = output_directory + "gas_" + std::to_string(frame_num) + ".ply";
-        field_helper.save_ply(output_file, dx, gamma);
-        // now just output vtk along with ply, later seperate them as options TODO
-        if (output_vtk)
-            dump_vtk(frame_num);
-    }
 };
+
 typedef GasSimulator<double, 3, long long, true> zenCompressSim;
 }
 } // namespace Bow::EulerGas
