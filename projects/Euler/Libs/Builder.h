@@ -42,7 +42,7 @@ public:
     void build(T dt, const MatrixOperators<T, StorageIndex>& operators, bool build_RHS_only)
     {
         BOW_TIMER_FLAG("Build");
-        Logging::info("Build");
+        Logging::debug("Build");
 
         StorageIndex n_P = operators.Linear_P.size(), n_Y = operators.Linear_Y.size(), n_H = operators.Linear_H.size();
         StorageIndex offset_0 = 0, offset_1 = n_P, offset_2 = n_P + n_Y;
@@ -52,33 +52,33 @@ public:
 
             // block 11
             // GT G + a diag
-            fill_block(offset_0, offset_0, operators.GT * operators.invM * operators.G + dx * dx / dt / dt * operators.invS, A_coeffs);
+            fill_block(offset_0, offset_0, dt * dt * operators.GT * operators.invM * operators.G + dx * dx * operators.invS, A_coeffs);
             // block 12
             // GT B
-            fill_block(offset_0, offset_1, operators.GT * operators.invM * operators.Y, A_coeffs);
+            fill_block(offset_0, offset_1, dt * dt * operators.GT * operators.invM * operators.Y, A_coeffs);
             // block 13
             // GT H
-            fill_block(offset_0, offset_2, operators.GT * operators.invM * operators.H, A_coeffs);
+            fill_block(offset_0, offset_2, dt * dt * operators.GT * operators.invM * operators.H, A_coeffs);
 
             // block 21
             // BT G
-            fill_block(offset_1, offset_0, operators.YT * operators.invM * operators.G, A_coeffs);
+            fill_block(offset_1, offset_0, dt * dt * operators.YT * operators.invM * operators.G, A_coeffs);
             // block 22
             // BT B
-            fill_block(offset_1, offset_1, operators.YT * operators.invM * operators.Y, A_coeffs);
+            fill_block(offset_1, offset_1, dt * dt * operators.YT * operators.invM * operators.Y, A_coeffs);
             // block 23
             // BT H
-            fill_block(offset_1, offset_2, operators.YT * operators.invM * operators.H, A_coeffs);
+            fill_block(offset_1, offset_2, dt * dt * operators.YT * operators.invM * operators.H, A_coeffs);
 
             // block 31
             // HT G
-            fill_block(offset_2, offset_0, operators.HT * operators.invM * operators.G, A_coeffs);
+            fill_block(offset_2, offset_0, dt * dt * operators.HT * operators.invM * operators.G, A_coeffs);
             // block 32
             // HT B
-            fill_block(offset_2, offset_1, operators.HT * operators.invM * operators.Y, A_coeffs);
+            fill_block(offset_2, offset_1, dt * dt * operators.HT * operators.invM * operators.Y, A_coeffs);
             // block 33
             // HT H
-            fill_block(offset_2, offset_2, operators.HT * operators.invM * operators.H, A_coeffs);
+            fill_block(offset_2, offset_2, dt * dt * operators.HT * operators.invM * operators.H, A_coeffs);
 
             A.resize(n_P + n_Y + n_H, n_P + n_Y + n_H);
             A.setZero();
@@ -87,13 +87,13 @@ public:
         // RHS
         RHS.resize(n_P + n_Y + n_H);
         RHS.setZero();
-        RHS << dx * dx / dt / dt * operators.RHS_invS_P + dx / dt * operators.RHS_GT_U, dx / dt * operators.RHS_YT_U, dx / dt * operators.RHS_HT_U;
+        RHS << dx * dx * operators.RHS_invS_P + dx * dt * operators.RHS_GT_U, dx * dt * operators.RHS_YT_U, dx * dt * operators.RHS_HT_U;
     };
 
     void solve(int it_limit, T converge_cretiria, bool compute)
     {
         BOW_TIMER_FLAG("Solve");
-        Logging::info("Solve");
+        Logging::debug("Solve");
         if (compute) {
 #ifdef BOW_AMGCL
             solver.prm.put("solver.maxiter", it_limit);
@@ -160,7 +160,7 @@ public:
     void coupled_build(T dt, const MatrixOperators<T, StorageIndex>& operators1, const MatrixOperators<T, StorageIndex>& operators2, bool build_RHS_only)
     {
         BOW_TIMER_FLAG("Build");
-        Logging::info("Build");
+        Logging::debug("Build");
 
         StorageIndex n_P1 = operators1.Linear_P.size(), n_Y1 = operators1.Linear_Y.size(), n_H1 = operators1.Linear_H.size();
         StorageIndex n_P2 = operators2.Linear_P.size(), n_Y2 = operators2.Linear_Y.size(), n_H2 = operators2.Linear_H.size();
@@ -173,54 +173,54 @@ public:
 
             // block 11
             // GT G + a diag
-            fill_block(offset_0, offset_0, operators1.GT * operators1.invM * operators1.G + dx * dx / dt / dt * operators1.invS, A_coeffs);
+            fill_block(offset_0, offset_0, dt * dt * operators1.GT * operators1.invM * operators1.G + dx * dx * operators1.invS, A_coeffs);
             // block 12
             // GT B
-            fill_block(offset_0, offset_1, operators1.GT * operators1.invM * operators1.Y, A_coeffs);
+            fill_block(offset_0, offset_1, dt * dt * operators1.GT * operators1.invM * operators1.Y, A_coeffs);
             // block 13
             // GT H
-            fill_block(offset_0, offset_2, operators1.GT * operators1.invM * operators1.H, A_coeffs);
+            fill_block(offset_0, offset_2, dt * dt * operators1.GT * operators1.invM * operators1.H, A_coeffs);
 
             // block 21
             // BT G
-            fill_block(offset_1, offset_0, operators1.YT * operators1.invM * operators1.G, A_coeffs);
+            fill_block(offset_1, offset_0, dt * dt * operators1.YT * operators1.invM * operators1.G, A_coeffs);
             // block 22
             // BT B
-            fill_block(offset_1, offset_1, operators1.YT * operators1.invM * operators1.Y, A_coeffs);
+            fill_block(offset_1, offset_1, dt * dt * operators1.YT * operators1.invM * operators1.Y, A_coeffs);
             // block 23
             // BT H
-            fill_block(offset_1, offset_2, operators1.YT * operators1.invM * operators1.H, A_coeffs);
+            fill_block(offset_1, offset_2, dt * dt * operators1.YT * operators1.invM * operators1.H, A_coeffs);
 
             // block 31
             // HT G
-            fill_block(offset_2, offset_0, operators1.HT * operators1.invM * operators1.G, A_coeffs);
+            fill_block(offset_2, offset_0, dt * dt * operators1.HT * operators1.invM * operators1.G, A_coeffs);
             // block 32
             // HT B
-            fill_block(offset_2, offset_1, operators1.HT * operators1.invM * operators1.Y, A_coeffs);
+            fill_block(offset_2, offset_1, dt * dt * operators1.HT * operators1.invM * operators1.Y, A_coeffs);
 
             // block 33
             // HT H + HTH
-            fill_block(offset_2, offset_2, operators1.HT * operators1.invM * operators1.H + operators2.HT * operators2.invM * operators2.H, A_coeffs);
+            fill_block(offset_2, offset_2, dt * dt * operators1.HT * operators1.invM * operators1.H + dt * dt * operators2.HT * operators2.invM * operators2.H, A_coeffs);
             // block 34
             // HTG
-            fill_block(offset_2, offset_3, operators2.HT * operators2.invM * operators2.G, A_coeffs);
+            fill_block(offset_2, offset_3, dt * dt * operators2.HT * operators2.invM * operators2.G, A_coeffs);
             // block 35
             // HTB
-            fill_block(offset_2, offset_4, operators2.HT * operators2.invM * operators2.Y, A_coeffs);
+            fill_block(offset_2, offset_4, dt * dt * operators2.HT * operators2.invM * operators2.Y, A_coeffs);
 
             //43
-            fill_block(offset_3, offset_2, operators2.GT * operators2.invM * operators2.H, A_coeffs);
+            fill_block(offset_3, offset_2, dt * dt * operators2.GT * operators2.invM * operators2.H, A_coeffs);
             //44
-            fill_block(offset_3, offset_3, operators2.GT * operators2.invM * operators2.G + dx * dx / dt / dt * operators2.invS, A_coeffs);
+            fill_block(offset_3, offset_3, dt * dt * operators2.GT * operators2.invM * operators2.G + dx * dx * operators2.invS, A_coeffs);
             //45
-            fill_block(offset_3, offset_4, operators2.GT * operators2.invM * operators2.Y, A_coeffs);
+            fill_block(offset_3, offset_4, dt * dt * operators2.GT * operators2.invM * operators2.Y, A_coeffs);
 
             //53
-            fill_block(offset_4, offset_2, operators2.YT * operators2.invM * operators2.H, A_coeffs);
+            fill_block(offset_4, offset_2, dt * dt * operators2.YT * operators2.invM * operators2.H, A_coeffs);
             //54
-            fill_block(offset_4, offset_3, operators2.YT * operators2.invM * operators2.G, A_coeffs);
+            fill_block(offset_4, offset_3, dt * dt * operators2.YT * operators2.invM * operators2.G, A_coeffs);
             //55
-            fill_block(offset_4, offset_4, operators2.YT * operators2.invM * operators2.Y, A_coeffs);
+            fill_block(offset_4, offset_4, dt * dt * operators2.YT * operators2.invM * operators2.Y, A_coeffs);
 
             A.resize(tot_dof, tot_dof);
             A.setZero();
@@ -229,7 +229,7 @@ public:
         // RHS
         RHS.resize(tot_dof);
         RHS.setZero();
-        RHS << dx * dx / dt / dt * operators1.RHS_invS_P + dx / dt * operators1.RHS_GT_U, dx / dt * operators1.RHS_YT_U, dx / dt * operators1.RHS_HT_U + dx / dt * operators2.RHS_HT_U, dx * dx / dt / dt * operators2.RHS_invS_P + dx / dt * operators2.RHS_GT_U, dx / dt * operators2.RHS_YT_U;
+        RHS << dx * dx * operators1.RHS_invS_P + dx * dt * operators1.RHS_GT_U, dx * dt * operators1.RHS_YT_U, dx * dt * operators1.RHS_HT_U + dx * dt * operators2.RHS_HT_U, dx * dx * operators2.RHS_invS_P + dx * dt * operators2.RHS_GT_U, dx * dt * operators2.RHS_YT_U;
     };
 
     void coupled_build_and_solve(T dt, MatrixOperators<T, StorageIndex>& operators1, MatrixOperators<T, StorageIndex>& operators2, bool build_RHS_only, int it_limit, T converge_cretiria)
