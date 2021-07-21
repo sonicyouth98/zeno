@@ -423,6 +423,10 @@ public:
         convert_q_to_primitives();
         backup();
     }
+
+    void dump_output(int frame_num) override
+    {
+    }
 };
 
 typedef GasSimulator<double, 3, long long, true> zenCompressSim;
