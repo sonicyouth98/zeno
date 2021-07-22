@@ -397,6 +397,9 @@ public:
             initialized = true;
         }
 
+        // reset fluid cell map to the origin
+        field_helper.cell_type = field_helper.cell_type_origin;
+
         mark_dof();
         convert_q_to_primitives();
         backup();

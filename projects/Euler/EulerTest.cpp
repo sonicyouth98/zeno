@@ -256,6 +256,47 @@ ZENDEFNODE(makeCompressibleSim, {
                                     {"CompressibleFlow"},
                                 });
 
+struct BackupField : zeno::INode {
+  virtual void apply() override {
+    auto flowData = get_input("inFlowData")->as<ZenCompressAero>();
+    Bow::EulerGas::zenCompressSim sim(
+        flowData->gas->dx, flowData->gas->grid.bbmin, flowData->gas->grid.bbmax,
+        flowData->gas->m_q_amb, *(flowData->gas));
+
+    sim.backup();
+
+    set_output_ref("outFlowData", get_input_ref("inFlowData"));
+  }
+};
+ZENDEFNODE(BackupField, {
+                            {"inFlowData"},
+                            {"outFlowData"},
+                            {},
+                            {"CompressibleFlow"},
+                        });
+
+struct InitField : zeno::INode {
+  virtual void apply() override {
+    auto flowData = get_input("inFlowData")->as<ZenCompressAero>();
+    auto simParam = get_input("simParam")->as<CompressibleSimStates>();
+    Bow::EulerGas::zenCompressSim sim(
+        flowData->gas->dx, flowData->gas->grid.bbmin, flowData->gas->grid.bbmax,
+        flowData->gas->m_q_amb, *(flowData->gas));
+
+    sim.setSolverControl(simParam->data);
+    sim.initialize();
+    simParam->data = sim.getSolverControl();
+
+    set_output_ref("outFlowData", get_input_ref("inFlowData"));
+  }
+};
+ZENDEFNODE(InitField, {
+                          {"inFlowData", "simParam"},
+                          {"outFlowData"},
+                          {},
+                          {"CompressibleFlow"},
+                      });
+
 struct MakeVelocityPressure : zeno::INode {
   virtual void apply() override {
     auto flowData = get_input("inFlowData")->as<ZenCompressAero>();
@@ -266,7 +307,6 @@ struct MakeVelocityPressure : zeno::INode {
 
     sim.setSolverControl(simParam->data);
     sim.convert_q_to_primitives();
-    sim.backup();
     simParam->data = sim.getSolverControl();
 
     set_output_ref("outFlowData", get_input_ref("inFlowData"));
