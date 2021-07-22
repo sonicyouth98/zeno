@@ -125,7 +125,7 @@ struct DenseFieldToVDB : zeno::INode {
       set_output("VDBField", oField);
     }
   }
-}; // end DenseFieldToVDBNode
+};
 
 ZENDEFNODE(DenseFieldToVDB, {
                                 {"inDenseField"},
@@ -183,9 +183,23 @@ struct GetDenseField : zeno::INode {
       oField->m_size = gas->Pf.size();
       set_output("outDenseField", oField);
     }
-  }
-}; // end ExtractDenseField
+    if (field == std::string("cellType")) {
+      auto oField = zeno::IObject::make<DenseIntGrid>();
+      oField->m_grid = &(gas->cell_type[0]);
+      oField->dx = gas->dx;
+      oField->bmin = openvdb::Coord(gas->grid.bbmin[0], gas->grid.bbmin[1],
+                                    gas->grid.bbmin[2]);
 
+      oField->ni = gas->grid.bbmax[0] - gas->grid.bbmin[0];
+      oField->nj = gas->grid.bbmax[1] - gas->grid.bbmin[1];
+      oField->nk = gas->grid.bbmax[2] - gas->grid.bbmin[2];
+
+      oField->spatialType = std::string("center");
+      oField->m_size = gas->Pf.size();
+      set_output("outDenseField", oField);
+    }
+  }
+};
 ZENDEFNODE(GetDenseField, {
                               {"inSolverData"},
                               {"outDenseField"},
@@ -337,6 +351,90 @@ ZENDEFNODE(CompressibleMarkDOF, {
                                     {},
                                     {"CompressibleFlow"},
                                 });
+
+struct MarkMovingSolidCellsByVDB : zeno::INode {
+  virtual void apply() override {
+    auto flowData = get_input("inFlowData")->as<ZenCompressAero>();
+    auto simParam = get_input("simParam")->as<CompressibleSimStates>();
+    auto sdf_vdb = get_input("SDFVDBField")->as<VDBFloatGrid>();
+    auto solid_vel_vdb = get_input("SolidVelVDBField")->as<VDBFloat3Grid>();
+    auto sdf_access = sdf_vdb->m_grid->getAccessor();
+    auto solid_vel_access = solid_vel_vdb->m_grid->getAccessor();
+    // reset cell type to origin
+    // reset solid velocity to zero
+    flowData->gas->cell_type = flowData->gas->cell_type_origin;
+    std::fill(flowData->gas->us.begin(), flowData->gas->us.end(),
+              Bow::Vector<double, 3>::Zero());
+    // loop from bbmin to bbmax
+    // check if sdf is neg, if yes set that grid (if origin is gas) as
+    // solid, and then copy the velocity to solid cell
+    // remember to handle for marking(treat solid just like bound), adv(disable
+    // mixed bc, all reflective)+prj(source term), which are in other files
+    flowData->gas->iterateGridParallel([&](const Bow::Vector<int, 3> &I) {
+      int idx = flowData->gas->grid[I].idx;
+      openvdb::Coord xyz(I(0), I(1), I(2));
+      if (flowData->gas->cell_type[idx] == Bow::EulerGas::CellType::GAS) {
+        if (sdf_access.getValue(xyz) < 0) {
+          flowData->gas->cell_type[idx] = Bow::EulerGas::CellType::SOLID;
+          auto vel = solid_vel_access.getValue(xyz);
+          flowData->gas->us[idx] =
+              Bow::Vector<double, 3>(vel.x(), vel.y(), vel.z());
+        }
+      }
+    });
+    // then, for the newly released gas cell, set the
+    // value by adj values or amb
+    // fix_newly_released_gas_cell_qs
+    flowData->gas->iterateGridParallel([&](const Bow::Vector<int, 3> &I) {
+      int idx = flowData->gas->grid[I].idx;
+      if (flowData->gas->cell_type[idx] == Bow::EulerGas::CellType::GAS &&
+          flowData->gas->cell_type_backup[idx] ==
+              Bow::EulerGas::CellType::SOLID) {
+        Bow::Array<double, 5, 1> sum_Qs = Bow::Array<double, 5, 1>::Zero();
+        int sum_Qs_n = 0;
+        flowData->gas->iterateKernel(
+            [&](const Bow::Vector<int, 3> &I,
+                const Bow::Vector<int, 3> &adj_I) {
+              // dont fall outof the bbox
+              if (!flowData->gas->grid.in_bbox(adj_I, 0))
+                return;
+              if (flowData->gas->grid[adj_I].idx < 0)
+                return;
+              int adj_idx = flowData->gas->grid[adj_I].idx;
+              if (flowData->gas->cell_type_backup[adj_idx] ==
+                  Bow::EulerGas::CellType::GAS) {
+                sum_Qs += flowData->gas->q_backup[adj_idx];
+                sum_Qs_n++;
+              }
+            },
+            I, -1, 2);
+        if (sum_Qs_n > 0) {
+          sum_Qs /= (double)sum_Qs_n;
+          flowData->gas->q[idx] = sum_Qs;
+        } else {
+          Bow::Logging::warn(
+              "a gas cell released from solid has no gas neighbor");
+          flowData->gas->q[idx] = simParam->data.q_amb;
+        }
+      }
+    });
+    // set output reference for flowData
+    set_output_ref("outFlowData", get_input_ref("inFlowData"));
+    // following this node you should add markDofNode and BackupNode
+    // sequentially
+  }
+};
+ZENDEFNODE(MarkMovingSolidCellsByVDB, {
+                                          {
+                                              "inFlowData",
+                                              "simParam",
+                                              "SDFVDBField",
+                                              "SolidVelVDBField",
+                                          },
+                                          {"outFlowData"},
+                                          {},
+                                          {"CompressibleFlow"},
+                                      });
 
 struct CompressibleAdvection : zeno::INode {
   virtual void apply() override {

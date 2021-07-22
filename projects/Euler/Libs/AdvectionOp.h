@@ -218,42 +218,42 @@ public:
                     // calculate passable ratio, not useful if interface is not
                     // gas-solid/solid-gas
                     T i_frac = 0;
-                    if (IT == InterfaceType::GAS_SOLID || IT == InterfaceType::SOLID_GAS) {
-                        if constexpr (dim == 2) {
-                            T vol_frac_l = std::min(
-                                std::max((T)0, field_helper.ghost_volume_center[IDX[1]] * std::pow(inv_dx, dim)),
-                                (T)1);
-                            T vol_frac_r = std::min(
-                                std::max((T)0, field_helper.ghost_volume_center[IDX[2]] * std::pow(inv_dx, dim)),
-                                (T)1);
-                            T area_frac_l = std::min(
-                                std::max((T)0,
-                                    (T)1 - (T)2 * std::pow(vol_frac_l / M_PI, 0.5)),
-                                (T)1);
-                            T area_frac_r = std::min(
-                                std::max((T)0,
-                                    (T)1 - (T)2 * std::pow(vol_frac_r / M_PI, 0.5)),
-                                (T)1);
-                            i_frac = area_frac_l * area_frac_r;
-                        }
-                        else if constexpr (dim == 3) {
-                            T vol_frac_l = std::min(
-                                std::max((T)0, field_helper.ghost_volume_center[IDX[1]] * std::pow(inv_dx, dim)),
-                                (T)1);
-                            T vol_frac_r = std::min(
-                                std::max((T)0, field_helper.ghost_volume_center[IDX[2]] * std::pow(inv_dx, dim)),
-                                (T)1);
-                            T area_frac_l = std::min(
-                                std::max((T)0,
-                                    (T)1 - M_PI * std::pow(0.75 * vol_frac_l / M_PI, 0.5)),
-                                (T)1);
-                            T area_frac_r = std::min(
-                                std::max((T)0,
-                                    (T)1 - M_PI * std::pow(0.75 * vol_frac_r / M_PI, 0.5)),
-                                (T)1);
-                            i_frac = area_frac_l * area_frac_r;
-                        }
-                    }
+                    // if (IT == InterfaceType::GAS_SOLID || IT == InterfaceType::SOLID_GAS) {
+                    //     if constexpr (dim == 2) {
+                    //         T vol_frac_l = std::min(
+                    //             std::max((T)0, field_helper.ghost_volume_center[IDX[1]] * std::pow(inv_dx, dim)),
+                    //             (T)1);
+                    //         T vol_frac_r = std::min(
+                    //             std::max((T)0, field_helper.ghost_volume_center[IDX[2]] * std::pow(inv_dx, dim)),
+                    //             (T)1);
+                    //         T area_frac_l = std::min(
+                    //             std::max((T)0,
+                    //                 (T)1 - (T)2 * std::pow(vol_frac_l / M_PI, 0.5)),
+                    //             (T)1);
+                    //         T area_frac_r = std::min(
+                    //             std::max((T)0,
+                    //                 (T)1 - (T)2 * std::pow(vol_frac_r / M_PI, 0.5)),
+                    //             (T)1);
+                    //         i_frac = area_frac_l * area_frac_r;
+                    //     }
+                    //     else if constexpr (dim == 3) {
+                    //         T vol_frac_l = std::min(
+                    //             std::max((T)0, field_helper.ghost_volume_center[IDX[1]] * std::pow(inv_dx, dim)),
+                    //             (T)1);
+                    //         T vol_frac_r = std::min(
+                    //             std::max((T)0, field_helper.ghost_volume_center[IDX[2]] * std::pow(inv_dx, dim)),
+                    //             (T)1);
+                    //         T area_frac_l = std::min(
+                    //             std::max((T)0,
+                    //                 (T)1 - M_PI * std::pow(0.75 * vol_frac_l / M_PI, 0.5)),
+                    //             (T)1);
+                    //         T area_frac_r = std::min(
+                    //             std::max((T)0,
+                    //                 (T)1 - M_PI * std::pow(0.75 * vol_frac_r / M_PI, 0.5)),
+                    //             (T)1);
+                    //         i_frac = area_frac_l * area_frac_r;
+                    //     }
+                    // }
                     // apply stencil
                     temp_flux.col(d) = mixed_bc_flux(Q, U, cell_types, eps.col(d), i_frac);
                 }

@@ -91,13 +91,13 @@ public:
         T, dim, StorageIndex, XFastestSweep,
         Bow::LinearProjection::BSplineDegree::B1B0>
         gas_assembler;
-    Bow::LinearProjection::SolidAssembler<
-        T, dim, StorageIndex, XFastestSweep,
-        Bow::LinearProjection::BSplineDegree::B2B1>
-        solid_assembler;
+    // Bow::LinearProjection::SolidAssembler<
+    //     T, dim, StorageIndex, XFastestSweep,
+    //     Bow::LinearProjection::BSplineDegree::B2B1>
+    //     solid_assembler;
     Bow::LinearProjection::Builder<T, dim, StorageIndex> sys_builder;
-    Bow::LinearProjection::CoupledBuilder<T, dim, StorageIndex>
-        coupling_sys_builder;
+    // Bow::LinearProjection::CoupledBuilder<T, dim, StorageIndex>
+    //     coupling_sys_builder;
 
     // set ambient value
     void set_ambient(const Array<T, dim + 2, 1> q_amb_, const T gamma_)
@@ -111,7 +111,7 @@ public:
             gamma_, int_e);
         gamma = gamma_;
         gas_assembler.gamma = gamma;
-        solid_assembler.P_amb = P_amb;
+        // solid_assembler.P_amb = P_amb;
         // threshold for clamping
         lowest_rho = clamp_ratio * q_amb(0);
         lowest_int_e_by_rho = clamp_ratio * int_e / q_amb(0);
@@ -122,7 +122,7 @@ public:
     {
         dx = dx_;
         sys_builder.dx = dx_;
-        coupling_sys_builder.dx = dx_;
+        // coupling_sys_builder.dx = dx_;
     }
 
     solverControl<T, dim> getSolverControl()
@@ -181,7 +181,7 @@ public:
         const Array<T, dim + 2, 1> q_amb_, FieldHelperDense<T, dim, StorageIndex, XFastestSweep>& _field_helper,
         const T gamma_ = 1.4,
         const T CFL_ = 0.5)
-        : dx(dx_), field_helper(_field_helper), sys_builder(dx_), coupling_sys_builder(dx_), gamma(gamma_), CFL(CFL_)
+        : dx(dx_), field_helper(_field_helper), sys_builder(dx_), gamma(gamma_), CFL(CFL_)
     {
         set_ambient(q_amb_, gamma_);
         // close the simd domain
@@ -335,31 +335,31 @@ public:
         }
 
         gas_assembler.copy_from_spatial_field(field_helper);
-        gas_assembler.assemble(
-            field_helper, field_helper.B_interfaces, field_helper.H_interfaces,
-            field_helper.moving_Yf_interfaces_override, (substep > 0));
-        if (have_solid) {
-            solid_assembler.copy_from_spatial_field(field_helper);
-            solid_assembler.assemble(
-                field_helper, field_helper.Bs_interfaces, field_helper.Hs_interfaces,
-                field_helper.moving_Ys_interfaces_override, (substep > 0));
-            coupling_sys_builder.coupled_build_and_solve(
-                dt, gas_assembler.global_operators, solid_assembler.global_operators,
-                (substep > 0), cg_it_limit, cg_converge_cretiria);
-            // fix solid velocity by weakform solution
-            solid_assembler.fix_velocity_by_projection(dt / dx);
-            // the gas velocity is not fixed here
-            // gas field's velocity will be overwrtten later, so the copy of velocity
-            // here won't cause any error however we need the gas pressure field later
-            gas_assembler.copy_to_spatial_field(field_helper);
-            solid_assembler.copy_to_spatial_field(field_helper);
-        }
-        else {
-            sys_builder.build_and_solve(dt, gas_assembler.global_operators,
-                (substep > 0), cg_it_limit,
-                cg_converge_cretiria);
-            gas_assembler.copy_to_spatial_field(field_helper);
-        }
+        gas_assembler.assemble(field_helper, field_helper.B_interfaces, field_helper.H_interfaces, field_helper.moving_Yf_interfaces_override, (substep > 0));
+        sys_builder.build_and_solve(dt, gas_assembler.global_operators, (substep > 0), cg_it_limit, cg_converge_cretiria);
+        gas_assembler.copy_to_spatial_field(field_helper);
+        // if (have_solid) {
+        //     solid_assembler.copy_from_spatial_field(field_helper);
+        //     solid_assembler.assemble(
+        //         field_helper, field_helper.Bs_interfaces, field_helper.Hs_interfaces,
+        //         field_helper.moving_Ys_interfaces_override, (substep > 0));
+        //     coupling_sys_builder.coupled_build_and_solve(
+        //         dt, gas_assembler.global_operators, solid_assembler.global_operators,
+        //         (substep > 0), cg_it_limit, cg_converge_cretiria);
+        //     // fix solid velocity by weakform solution
+        //     solid_assembler.fix_velocity_by_projection(dt / dx);
+        //     // the gas velocity is not fixed here
+        //     // gas field's velocity will be overwrtten later, so the copy of velocity
+        //     // here won't cause any error however we need the gas pressure field later
+        //     gas_assembler.copy_to_spatial_field(field_helper);
+        //     solid_assembler.copy_to_spatial_field(field_helper);
+        // }
+        // else {
+        //     sys_builder.build_and_solve(dt, gas_assembler.global_operators,
+        //         (substep > 0), cg_it_limit,
+        //         cg_converge_cretiria);
+        //     gas_assembler.copy_to_spatial_field(field_helper);
+        // }
 
         // fix gas qs by conservation form
         post_fix_mu(dt, substep);

@@ -183,88 +183,88 @@ public:
             g.idYs = -1;
         };
         field_helper.iterateGridSerial(reset_ids, field_helper.grid.ghost_layer);
-        {
-            // solid info
-            int active_us_node = 0;
-            int active_Ps_node = 0;
-            int active_Ys_node = 0;
-            // 1.mark normal u
-            auto mark_normal_idu = [&](const Vector<int, dim>& I) {
-                auto& g = field_helper.grid[I];
-                if (field_helper.cell_type[g.idx] == CellType::SOLID)
-                    field_helper.grid[I].idus = active_us_node++;
-            };
-            field_helper.iterateGridSerial(mark_normal_idu);
-            // 2.mark bound ghost u
-            auto mark_bound_idu = [&](const Vector<int, dim>& I) {
-                auto& g = field_helper.grid[I];
-                if (field_helper.cell_type[g.idx] == CellType::BOUND || field_helper.cell_type[g.idx] == CellType::FREE || field_helper.cell_type[g.idx] == CellType::INLET) {
-                    bool have_adj_solid = false;
-                    field_helper.iterateKernel(
-                        [&](const Vector<int, dim>& I, const Vector<int, dim>& adj_I) {
-                            auto& adj_g = field_helper.grid[adj_I];
-                            if (field_helper.cell_type[adj_g.idx] == CellType::SOLID)
-                                have_adj_solid = true;
-                        },
-                        I, -1, 2);
-                    if (have_adj_solid)
-                        field_helper.grid[I].idus = active_us_node++;
-                }
-            };
-            field_helper.iterateGridSerial(mark_bound_idu, 1);
-            // 3.mark ghost u
-            auto mark_ghost_idu = [&](const Vector<int, dim>& I) {
-                auto& g = field_helper.grid[I];
-                if (field_helper.cell_type[g.idx] == CellType::GAS) {
-                    bool have_adj_solid = false;
-                    field_helper.iterateKernel(
-                        [&](const Vector<int, dim>& I, const Vector<int, dim>& adj_I) {
-                            auto& adj_g = field_helper.grid[adj_I];
-                            if (field_helper.cell_type[adj_g.idx] == CellType::SOLID)
-                                have_adj_solid = true;
-                        },
-                        I, -1, 2);
-                    if (have_adj_solid)
-                        field_helper.grid[I].idus = active_us_node++;
-                }
-            };
-            field_helper.iterateGridSerial(mark_ghost_idu);
-            // 4.mark PYH
-            auto mark_Ps = [&](const Vector<int, dim>& I) {
-                auto& g = field_helper.grid[I];
-                bool have_adj_P = false;
-                bool have_adj_Y = false;
-                field_helper.iterateKernel(
-                    [&](const Vector<int, dim>& I, const Vector<int, dim>& adj_I) {
-                        auto& adj_g = field_helper.grid[adj_I];
-                        if (field_helper.cell_type[adj_g.idx] == CellType::SOLID)
-                            have_adj_P = true;
-                        if (field_helper.cell_type[adj_g.idx] == CellType::BOUND || field_helper.cell_type[adj_g.idx] == CellType::FREE || field_helper.cell_type[adj_g.idx] == CellType::INLET)
-                            have_adj_Y = true;
-                    },
-                    I, -1, 1);
-                if (have_adj_P)
-                    g.idPs = active_Ps_node++;
-                if (have_adj_P && have_adj_Y)
-                    g.idYs = active_Ys_node++;
-                // H marked in gas phase
-            };
-            field_helper.iterateGridSerial(mark_Ps, 1);
+        // {
+        //     // solid info
+        //     int active_us_node = 0;
+        //     int active_Ps_node = 0;
+        //     int active_Ys_node = 0;
+        //     // 1.mark normal u
+        //     auto mark_normal_idu = [&](const Vector<int, dim>& I) {
+        //         auto& g = field_helper.grid[I];
+        //         if (field_helper.cell_type[g.idx] == CellType::SOLID)
+        //             field_helper.grid[I].idus = active_us_node++;
+        //     };
+        //     field_helper.iterateGridSerial(mark_normal_idu);
+        //     // 2.mark bound ghost u
+        //     auto mark_bound_idu = [&](const Vector<int, dim>& I) {
+        //         auto& g = field_helper.grid[I];
+        //         if (field_helper.cell_type[g.idx] == CellType::BOUND || field_helper.cell_type[g.idx] == CellType::FREE || field_helper.cell_type[g.idx] == CellType::INLET) {
+        //             bool have_adj_solid = false;
+        //             field_helper.iterateKernel(
+        //                 [&](const Vector<int, dim>& I, const Vector<int, dim>& adj_I) {
+        //                     auto& adj_g = field_helper.grid[adj_I];
+        //                     if (field_helper.cell_type[adj_g.idx] == CellType::SOLID)
+        //                         have_adj_solid = true;
+        //                 },
+        //                 I, -1, 2);
+        //             if (have_adj_solid)
+        //                 field_helper.grid[I].idus = active_us_node++;
+        //         }
+        //     };
+        //     field_helper.iterateGridSerial(mark_bound_idu, 1);
+        //     // 3.mark ghost u
+        //     auto mark_ghost_idu = [&](const Vector<int, dim>& I) {
+        //         auto& g = field_helper.grid[I];
+        //         if (field_helper.cell_type[g.idx] == CellType::GAS) {
+        //             bool have_adj_solid = false;
+        //             field_helper.iterateKernel(
+        //                 [&](const Vector<int, dim>& I, const Vector<int, dim>& adj_I) {
+        //                     auto& adj_g = field_helper.grid[adj_I];
+        //                     if (field_helper.cell_type[adj_g.idx] == CellType::SOLID)
+        //                         have_adj_solid = true;
+        //                 },
+        //                 I, -1, 2);
+        //             if (have_adj_solid)
+        //                 field_helper.grid[I].idus = active_us_node++;
+        //         }
+        //     };
+        //     field_helper.iterateGridSerial(mark_ghost_idu);
+        //     // 4.mark PYH
+        //     auto mark_Ps = [&](const Vector<int, dim>& I) {
+        //         auto& g = field_helper.grid[I];
+        //         bool have_adj_P = false;
+        //         bool have_adj_Y = false;
+        //         field_helper.iterateKernel(
+        //             [&](const Vector<int, dim>& I, const Vector<int, dim>& adj_I) {
+        //                 auto& adj_g = field_helper.grid[adj_I];
+        //                 if (field_helper.cell_type[adj_g.idx] == CellType::SOLID)
+        //                     have_adj_P = true;
+        //                 if (field_helper.cell_type[adj_g.idx] == CellType::BOUND || field_helper.cell_type[adj_g.idx] == CellType::FREE || field_helper.cell_type[adj_g.idx] == CellType::INLET)
+        //                     have_adj_Y = true;
+        //             },
+        //             I, -1, 1);
+        //         if (have_adj_P)
+        //             g.idPs = active_Ps_node++;
+        //         if (have_adj_P && have_adj_Y)
+        //             g.idYs = active_Ys_node++;
+        //         // H marked in gas phase
+        //     };
+        //     field_helper.iterateGridSerial(mark_Ps, 1);
 
-            field_helper.nus = active_us_node;
-            field_helper.nPs = active_Ps_node;
-            field_helper.nYs = active_Ys_node;
+        //     field_helper.nus = active_us_node;
+        //     field_helper.nPs = active_Ps_node;
+        //     field_helper.nYs = active_Ys_node;
 
-            Logging::debug("active_us_node ", field_helper.nus);
-            Logging::debug("active_Ps_node ", field_helper.nPs);
-            Logging::debug("active_Ys_node ", field_helper.nYs);
-        }
+        //     Logging::debug("active_us_node ", field_helper.nus);
+        //     Logging::debug("active_Ps_node ", field_helper.nPs);
+        //     Logging::debug("active_Ys_node ", field_helper.nYs);
+        // }
         {
             // fluid info
             int active_u_node = 0;
             int active_P_node = 0;
             int active_Y_node = 0;
-            int active_H_node = 0;
+            // int active_H_node = 0;
             // 1.mark normal u
             auto mark_normal_idu = [&](const Vector<int, dim>& I) {
                 auto& g = field_helper.grid[I];
@@ -311,68 +311,68 @@ public:
                 auto& g = field_helper.grid[I];
                 bool have_adj_P = false;
                 bool have_adj_Y = false;
-                bool have_adj_H = false;
+                // bool have_adj_H = false;
                 field_helper.iterateKernel(
                     [&](const Vector<int, dim>& I, const Vector<int, dim>& adj_I) {
                         auto& adj_g = field_helper.grid[adj_I];
                         if (field_helper.cell_type[adj_g.idx] == CellType::GAS)
                             have_adj_P = true;
-                        if (field_helper.cell_type[adj_g.idx] == CellType::BOUND || field_helper.cell_type[adj_g.idx] == CellType::FREE || field_helper.cell_type[adj_g.idx] == CellType::INLET)
+                        if (field_helper.cell_type[adj_g.idx] == CellType::BOUND || field_helper.cell_type[adj_g.idx] == CellType::FREE || field_helper.cell_type[adj_g.idx] == CellType::INLET || field_helper.cell_type[adj_g.idx] == CellType::SOLID)
                             have_adj_Y = true;
-                        if (field_helper.cell_type[adj_g.idx] == CellType::SOLID)
-                            have_adj_H = true;
+                        // if (field_helper.cell_type[adj_g.idx] == CellType::SOLID)
+                        //     have_adj_H = true;
                     },
                     I, -1, 1);
                 if (have_adj_P)
                     g.idPf = active_P_node++;
                 if (have_adj_P && have_adj_Y)
                     g.idYf = active_Y_node++;
-                if (have_adj_P && have_adj_H)
-                    g.idH = active_H_node++;
+                // if (have_adj_P && have_adj_H)
+                //     g.idH = active_H_node++;
             };
             field_helper.iterateGridSerial(mark_Ps, 1);
 
             field_helper.nuf = active_u_node;
             field_helper.nPf = active_P_node;
             field_helper.nYf = active_Y_node;
-            field_helper.nHf = active_H_node;
+            // field_helper.nHf = active_H_node;
 
             Logging::debug("active_u_node ", field_helper.nuf);
             Logging::debug("active_P_node ", field_helper.nPf);
             Logging::debug("active_Y_node ", field_helper.nYf);
-            Logging::debug("active_H_node ", field_helper.nHf);
+            // Logging::debug("active_H_node ", field_helper.nHf);
         }
         // 5. mark selected interfaces
         auto mark_Interfaces = [&](const Vector<int, dim>& I) {
             auto IT = field_helper.interface_type(I);
             for (int d = 0; d < dim; d++) {
-                if (IT(d) == InterfaceType::GAS_BOUND || IT(d) == InterfaceType::BOUND_GAS || IT(d) == InterfaceType::GAS_FREE || IT(d) == InterfaceType::FREE_GAS || IT(d) == InterfaceType::GAS_INLET || IT(d) == InterfaceType::INLET_GAS) {
-                    T normal = ((IT(d) == InterfaceType::GAS_BOUND || IT(d) == InterfaceType::GAS_FREE || IT(d) == InterfaceType::GAS_INLET)
+                if (IT(d) == InterfaceType::GAS_BOUND || IT(d) == InterfaceType::BOUND_GAS || IT(d) == InterfaceType::GAS_FREE || IT(d) == InterfaceType::FREE_GAS || IT(d) == InterfaceType::GAS_INLET || IT(d) == InterfaceType::INLET_GAS || IT(d) == InterfaceType::GAS_SOLID || IT(d) == InterfaceType::SOLID_GAS) {
+                    T normal = ((IT(d) == InterfaceType::GAS_BOUND || IT(d) == InterfaceType::GAS_FREE || IT(d) == InterfaceType::GAS_INLET || IT(d) == InterfaceType::GAS_SOLID)
                             ? 1
                             : -1);
                     auto it_mark = std::make_tuple(I, d, normal);
                     field_helper.B_interfaces.push_back(it_mark);
                 }
-                else if (IT(d) == InterfaceType::SOLID_BOUND || IT(d) == InterfaceType::BOUND_SOLID || IT(d) == InterfaceType::SOLID_FREE || IT(d) == InterfaceType::FREE_SOLID || IT(d) == InterfaceType::SOLID_INLET || IT(d) == InterfaceType::INLET_SOLID) {
-                    T normal = ((IT(d) == InterfaceType::SOLID_BOUND || IT(d) == InterfaceType::SOLID_FREE || IT(d) == InterfaceType::SOLID_INLET)
-                            ? 1
-                            : -1);
-                    auto it_mark = std::make_tuple(I, d, normal);
-                    field_helper.Bs_interfaces.push_back(it_mark);
-                }
-                else if (IT(d) == InterfaceType::GAS_SOLID || IT(d) == InterfaceType::SOLID_GAS) {
-                    T normal_gas = (IT(d) == InterfaceType::GAS_SOLID ? 1 : -1);
-                    T normal_solid = -normal_gas;
-                    auto it_mark_gas = std::make_tuple(I, d, normal_gas);
-                    auto it_mark_solid = std::make_tuple(I, d, normal_solid);
-                    field_helper.H_interfaces.push_back(it_mark_gas);
-                    field_helper.Hs_interfaces.push_back(it_mark_solid);
-                }
+                // else if (IT(d) == InterfaceType::SOLID_BOUND || IT(d) == InterfaceType::BOUND_SOLID || IT(d) == InterfaceType::SOLID_FREE || IT(d) == InterfaceType::FREE_SOLID || IT(d) == InterfaceType::SOLID_INLET || IT(d) == InterfaceType::INLET_SOLID) {
+                //     T normal = ((IT(d) == InterfaceType::SOLID_BOUND || IT(d) == InterfaceType::SOLID_FREE || IT(d) == InterfaceType::SOLID_INLET)
+                //             ? 1
+                //             : -1);
+                //     auto it_mark = std::make_tuple(I, d, normal);
+                //     field_helper.Bs_interfaces.push_back(it_mark);
+                // }
+                // else if (IT(d) == InterfaceType::GAS_SOLID || IT(d) == InterfaceType::SOLID_GAS) {
+                //     T normal_gas = (IT(d) == InterfaceType::GAS_SOLID ? 1 : -1);
+                //     T normal_solid = -normal_gas;
+                //     auto it_mark_gas = std::make_tuple(I, d, normal_gas);
+                //     auto it_mark_solid = std::make_tuple(I, d, normal_solid);
+                //     field_helper.H_interfaces.push_back(it_mark_gas);
+                //     field_helper.Hs_interfaces.push_back(it_mark_solid);
+                // }
             }
         };
         field_helper.iterateGridSerial(mark_Interfaces, 1);
-        BOW_ASSERT_INFO(field_helper.H_interfaces.size() == field_helper.Hs_interfaces.size(),
-            "interface number not consistent for two phases");
+        // BOW_ASSERT_INFO(field_helper.H_interfaces.size() == field_helper.Hs_interfaces.size(),
+        //     "interface number not consistent for two phases");
         // 6. mark moving Ys override to compensate the cases when the solid grid is
         // moving away from the bound if a solid grid is not 'entering' one
         // interface, then no constraint should be applied here to reach this
@@ -382,33 +382,33 @@ public:
         // velocity is +, then mark this Ys override with the same velocity as that
         // solid grid if a Ys interface is s-b, normal (+1), and the solid velocity
         // is -, then do the same thing
-        if (false) {
-            field_helper.moving_Ys_interfaces_override.clear();
-            for (const auto& it_mark : field_helper.Bs_interfaces) {
-                auto [I, d, normal] = it_mark;
-                if (normal > 0) {
-                    auto I_solid = I;
-                    I_solid(d) -= 1;
-                    int idx = field_helper.grid[I_solid].idx;
-                    T solid_vel = field_helper.us[idx](d);
-                    if (solid_vel < 0) {
-                        auto it_mark_moving_solid = std::make_tuple(I, d, normal, solid_vel);
-                        field_helper.moving_Ys_interfaces_override.push_back(
-                            it_mark_moving_solid);
-                    }
-                }
-                else if (normal < 0) {
-                    auto I_solid = I;
-                    int idx = field_helper.grid[I_solid].idx;
-                    T solid_vel = field_helper.us[idx](d);
-                    if (solid_vel > 0) {
-                        auto it_mark_moving_solid = std::make_tuple(I, d, normal, solid_vel);
-                        field_helper.moving_Ys_interfaces_override.push_back(
-                            it_mark_moving_solid);
-                    }
-                }
-            }
-        }
+        // if (false) {
+        //     field_helper.moving_Ys_interfaces_override.clear();
+        //     for (const auto& it_mark : field_helper.Bs_interfaces) {
+        //         auto [I, d, normal] = it_mark;
+        //         if (normal > 0) {
+        //             auto I_solid = I;
+        //             I_solid(d) -= 1;
+        //             int idx = field_helper.grid[I_solid].idx;
+        //             T solid_vel = field_helper.us[idx](d);
+        //             if (solid_vel < 0) {
+        //                 auto it_mark_moving_solid = std::make_tuple(I, d, normal, solid_vel);
+        //                 field_helper.moving_Ys_interfaces_override.push_back(
+        //                     it_mark_moving_solid);
+        //             }
+        //         }
+        //         else if (normal < 0) {
+        //             auto I_solid = I;
+        //             int idx = field_helper.grid[I_solid].idx;
+        //             T solid_vel = field_helper.us[idx](d);
+        //             if (solid_vel > 0) {
+        //                 auto it_mark_moving_solid = std::make_tuple(I, d, normal, solid_vel);
+        //                 field_helper.moving_Ys_interfaces_override.push_back(
+        //                     it_mark_moving_solid);
+        //             }
+        //         }
+        //     }
+        // }
     };
 };
 
