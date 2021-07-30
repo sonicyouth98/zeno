@@ -293,6 +293,7 @@ public:
             auto mark_ghost_idu = [&](const Vector<int, dim>& I) {
                 auto& g = field_helper.grid[I];
                 if (field_helper.cell_type[g.idx] == CellType::SOLID) {
+                    std::cout << "found a solid cell in marking phase" << std::endl;
                     bool have_adj_gas = false;
                     field_helper.iterateKernel(
                         [&](const Vector<int, dim>& I, const Vector<int, dim>& adj_I) {
@@ -337,10 +338,10 @@ public:
             field_helper.nYf = active_Y_node;
             // field_helper.nHf = active_H_node;
 
-            Logging::debug("active_u_node ", field_helper.nuf);
-            Logging::debug("active_P_node ", field_helper.nPf);
-            Logging::debug("active_Y_node ", field_helper.nYf);
-            // Logging::debug("active_H_node ", field_helper.nHf);
+            Logging::info("active_u_node ", field_helper.nuf);
+            Logging::info("active_P_node ", field_helper.nPf);
+            Logging::info("active_Y_node ", field_helper.nYf);
+            // Logging::info("active_H_node ", field_helper.nHf);
         }
         // 5. mark selected interfaces
         auto mark_Interfaces = [&](const Vector<int, dim>& I) {
@@ -353,62 +354,9 @@ public:
                     auto it_mark = std::make_tuple(I, d, normal);
                     field_helper.B_interfaces.push_back(it_mark);
                 }
-                // else if (IT(d) == InterfaceType::SOLID_BOUND || IT(d) == InterfaceType::BOUND_SOLID || IT(d) == InterfaceType::SOLID_FREE || IT(d) == InterfaceType::FREE_SOLID || IT(d) == InterfaceType::SOLID_INLET || IT(d) == InterfaceType::INLET_SOLID) {
-                //     T normal = ((IT(d) == InterfaceType::SOLID_BOUND || IT(d) == InterfaceType::SOLID_FREE || IT(d) == InterfaceType::SOLID_INLET)
-                //             ? 1
-                //             : -1);
-                //     auto it_mark = std::make_tuple(I, d, normal);
-                //     field_helper.Bs_interfaces.push_back(it_mark);
-                // }
-                // else if (IT(d) == InterfaceType::GAS_SOLID || IT(d) == InterfaceType::SOLID_GAS) {
-                //     T normal_gas = (IT(d) == InterfaceType::GAS_SOLID ? 1 : -1);
-                //     T normal_solid = -normal_gas;
-                //     auto it_mark_gas = std::make_tuple(I, d, normal_gas);
-                //     auto it_mark_solid = std::make_tuple(I, d, normal_solid);
-                //     field_helper.H_interfaces.push_back(it_mark_gas);
-                //     field_helper.Hs_interfaces.push_back(it_mark_solid);
-                // }
             }
         };
         field_helper.iterateGridSerial(mark_Interfaces, 1);
-        // BOW_ASSERT_INFO(field_helper.H_interfaces.size() == field_helper.Hs_interfaces.size(),
-        //     "interface number not consistent for two phases");
-        // 6. mark moving Ys override to compensate the cases when the solid grid is
-        // moving away from the bound if a solid grid is not 'entering' one
-        // interface, then no constraint should be applied here to reach this
-        // effect, the RHS(the divergence/penalty term) here should be modified to
-        // cancel out the RHS_Ys then after solving the velocity is unchanged
-        // equivlantly saying, if a Ys interface is b-s, normal (-1), and the solid
-        // velocity is +, then mark this Ys override with the same velocity as that
-        // solid grid if a Ys interface is s-b, normal (+1), and the solid velocity
-        // is -, then do the same thing
-        // if (false) {
-        //     field_helper.moving_Ys_interfaces_override.clear();
-        //     for (const auto& it_mark : field_helper.Bs_interfaces) {
-        //         auto [I, d, normal] = it_mark;
-        //         if (normal > 0) {
-        //             auto I_solid = I;
-        //             I_solid(d) -= 1;
-        //             int idx = field_helper.grid[I_solid].idx;
-        //             T solid_vel = field_helper.us[idx](d);
-        //             if (solid_vel < 0) {
-        //                 auto it_mark_moving_solid = std::make_tuple(I, d, normal, solid_vel);
-        //                 field_helper.moving_Ys_interfaces_override.push_back(
-        //                     it_mark_moving_solid);
-        //             }
-        //         }
-        //         else if (normal < 0) {
-        //             auto I_solid = I;
-        //             int idx = field_helper.grid[I_solid].idx;
-        //             T solid_vel = field_helper.us[idx](d);
-        //             if (solid_vel > 0) {
-        //                 auto it_mark_moving_solid = std::make_tuple(I, d, normal, solid_vel);
-        //                 field_helper.moving_Ys_interfaces_override.push_back(
-        //                     it_mark_moving_solid);
-        //             }
-        //         }
-        //     }
-        // }
     };
 };
 

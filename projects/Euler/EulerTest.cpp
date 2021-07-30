@@ -76,6 +76,36 @@ struct DenseFieldToVDB : zeno::INode {
         transform->postTranslate(openvdb::Vec3d{0.5, 0.5, 0.5} *
                                  double(inField->dx));
       }
+
+      oField->m_grid->setTransform(transform);
+
+      auto writeTo = oField->m_grid->getAccessor();
+
+#pragma omp parallel for
+      for (size_t index = 0; index < inField->size(); index++) {
+        int i = index % (ni + 4);
+        int j = index / (ni + 4) % (nj + 4);
+        int k = index / ((ni + 4) * (nj + 4));
+        if (i > 1 && i < ni + 2 && j > 1 && j < nj + 2 && k > 1 && k < nk + 2) {
+          openvdb::Coord xyz(i, j, k);
+          xyz = xyz + inField->bmin - openvdb::Coord(2, 2, 2);
+          writeTo.setValue(xyz, inField->m_grid[index]);
+        }
+      }
+      set_output("VDBField", oField);
+    } else if (type == std::string("Int32Grid")) {
+      auto inField = get_input("inDenseField")->as<DenseIntGrid>();
+      int ni = inField->ni;
+      int nj = inField->nj;
+      int nk = inField->nk;
+      auto oField = zeno::IObject::make<VDBFloatGrid>();
+      auto transform =
+          openvdb::math::Transform::createLinearTransform(inField->dx);
+      if (inField->spatialType == std::string("center")) {
+        transform->postTranslate(openvdb::Vec3d{0.5, 0.5, 0.5} *
+                                 double(inField->dx));
+      }
+
       oField->m_grid->setTransform(transform);
 
       auto writeTo = oField->m_grid->getAccessor();
@@ -259,7 +289,7 @@ struct makeCompressibleSim : zeno::INode {
         flowData->gas->dx, flowData->gas->grid.bbmin, flowData->gas->grid.bbmax,
         flowData->gas->m_q_amb, *(flowData->gas));
     simParam->data = sim.getSolverControl();
-    set_output_ref("outFlowData", get_input_ref("inFlowData"));
+    set_output("outFlowData", get_input("inFlowData"));
     set_output("SimParam", simParam);
   }
 };
@@ -277,9 +307,13 @@ struct BackupField : zeno::INode {
         flowData->gas->dx, flowData->gas->grid.bbmin, flowData->gas->grid.bbmax,
         flowData->gas->m_q_amb, *(flowData->gas));
 
+    // flowData->gas->q_backup = flowData->gas->q;
+    // flowData->gas->Pf_backup = flowData->gas->Pf;
+    // flowData->gas->cell_type_backup = flowData->gas->cell_type;
+
     sim.backup();
 
-    set_output_ref("outFlowData", get_input_ref("inFlowData"));
+    set_output("outFlowData", get_input("inFlowData"));
   }
 };
 ZENDEFNODE(BackupField, {
@@ -301,7 +335,7 @@ struct InitField : zeno::INode {
     sim.initialize();
     simParam->data = sim.getSolverControl();
 
-    set_output_ref("outFlowData", get_input_ref("inFlowData"));
+    set_output("outFlowData", get_input("inFlowData"));
   }
 };
 ZENDEFNODE(InitField, {
@@ -323,7 +357,16 @@ struct MakeVelocityPressure : zeno::INode {
     sim.convert_q_to_primitives();
     simParam->data = sim.getSolverControl();
 
-    set_output_ref("outFlowData", get_input_ref("inFlowData"));
+    // counting solid cell num
+    int num = 0;
+    flowData->gas->iterateGridParallel([&](const Bow::Vector<int, 3> &I) {
+      int idx = flowData->gas->grid[I].idx;
+      if (flowData->gas->cell_type[idx] == Bow::EulerGas::CellType::SOLID)
+        num++;
+    });
+    std::cout << "solid cell num after EOS is " << num << std::endl;
+
+    set_output("outFlowData", get_input("inFlowData"));
   }
 };
 ZENDEFNODE(MakeVelocityPressure, {
@@ -340,9 +383,31 @@ struct CompressibleMarkDOF : zeno::INode {
         flowData->gas->dx, flowData->gas->grid.bbmin, flowData->gas->grid.bbmax,
         flowData->gas->m_q_amb, *(flowData->gas));
 
-    sim.mark_dof();
+    // counting solid cell num
+    int num = 0;
+    flowData->gas->iterateGridParallel([&](const Bow::Vector<int, 3> &I) {
+      int idx = flowData->gas->grid[I].idx;
+      if (flowData->gas->cell_type[idx] == Bow::EulerGas::CellType::SOLID)
+        num++;
+    });
+    std::cout << "solid cell num before marking dof is " << num << std::endl;
 
-    set_output_ref("outFlowData", get_input_ref("inFlowData"));
+    sim.mark_dof();
+    // counting solid cell num
+    num = 0;
+    flowData->gas->iterateGridParallel([&](const Bow::Vector<int, 3> &I) {
+      int idx = flowData->gas->grid[I].idx;
+      if (flowData->gas->cell_type[idx] == Bow::EulerGas::CellType::SOLID)
+        num++;
+    });
+    std::cout << "solid cell num after marking dof is " << num << std::endl;
+
+    // // just trial
+    // flowData->gas
+    //     ->cell_type[flowData->gas->grid[Bow::Vector<int, 3>::Zero()].idx] =
+    //     Bow::EulerGas::CellType::SOLID;
+
+    set_output("outFlowData", get_input("inFlowData"));
   }
 };
 ZENDEFNODE(CompressibleMarkDOF, {
@@ -360,6 +425,16 @@ struct MarkMovingSolidCellsByVDB : zeno::INode {
     auto solid_vel_vdb = get_input("SolidVelVDBField")->as<VDBFloat3Grid>();
     auto sdf_access = sdf_vdb->m_grid->getAccessor();
     auto solid_vel_access = solid_vel_vdb->m_grid->getAccessor();
+
+    // counting solid cell num
+    int num = 0;
+    flowData->gas->iterateGridParallel([&](const Bow::Vector<int, 3> &I) {
+      int idx = flowData->gas->grid[I].idx;
+      if (flowData->gas->cell_type[idx] == Bow::EulerGas::CellType::SOLID)
+        num++;
+    });
+    std::cout << "solid cell num before marking sdf is " << num << std::endl;
+
     // reset cell type to origin
     // reset solid velocity to zero
     flowData->gas->cell_type = flowData->gas->cell_type_origin;
@@ -375,10 +450,15 @@ struct MarkMovingSolidCellsByVDB : zeno::INode {
       openvdb::Coord xyz(I(0), I(1), I(2));
       if (flowData->gas->cell_type[idx] == Bow::EulerGas::CellType::GAS) {
         if (sdf_access.getValue(xyz) < 0) {
+          std::cout << "found a solid cell" << std::endl;
+
           flowData->gas->cell_type[idx] = Bow::EulerGas::CellType::SOLID;
           auto vel = solid_vel_access.getValue(xyz);
           flowData->gas->us[idx] =
               Bow::Vector<double, 3>(vel.x(), vel.y(), vel.z());
+
+          std::cout << "solid cell vel is " << flowData->gas->us[idx]
+                    << std::endl;
         }
       }
     });
@@ -418,8 +498,16 @@ struct MarkMovingSolidCellsByVDB : zeno::INode {
         }
       }
     });
+    // counting solid cell num
+    num = 0;
+    flowData->gas->iterateGridParallel([&](const Bow::Vector<int, 3> &I) {
+      int idx = flowData->gas->grid[I].idx;
+      if (flowData->gas->cell_type[idx] == Bow::EulerGas::CellType::SOLID)
+        num++;
+    });
+    std::cout << "solid cell num after marking sdf is " << num << std::endl;
     // set output reference for flowData
-    set_output_ref("outFlowData", get_input_ref("inFlowData"));
+    set_output("outFlowData", get_input("inFlowData"));
     // following this node you should add markDofNode and BackupNode
     // sequentially
   }
@@ -451,7 +539,17 @@ struct CompressibleAdvection : zeno::INode {
     sim.setSolverControl(simParam->data);
     sim.advection(dt, rk_order);
     simParam->data = sim.getSolverControl();
-    set_output_ref("outFlowData", get_input_ref("inFlowData"));
+
+    // counting solid cell num
+    int num = 0;
+    flowData->gas->iterateGridParallel([&](const Bow::Vector<int, 3> &I) {
+      int idx = flowData->gas->grid[I].idx;
+      if (flowData->gas->cell_type[idx] == Bow::EulerGas::CellType::SOLID)
+        num++;
+    });
+    std::cout << "solid cell num after marking dof is " << num << std::endl;
+
+    set_output("outFlowData", get_input("inFlowData"));
   }
 };
 ZENDEFNODE(CompressibleAdvection,
@@ -477,7 +575,7 @@ struct CompressibleProjection : zeno::INode {
     sim.setSolverControl(simParam->data);
     sim.projection(dt, rk_order);
     simParam->data = sim.getSolverControl();
-    set_output_ref("outFlowData", get_input_ref("inFlowData"));
+    set_output("outFlowData", get_input("inFlowData"));
   }
 };
 ZENDEFNODE(CompressibleProjection,

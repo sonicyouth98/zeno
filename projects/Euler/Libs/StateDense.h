@@ -147,6 +147,7 @@ public:
             set_ambient(q_amb);
             initialized = true;
         }
+        std::cout << "constructed field helper" << std::endl;
     };
     ~FieldHelperDense(){};
 
