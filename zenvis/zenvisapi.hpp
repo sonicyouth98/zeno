@@ -9,6 +9,7 @@ namespace zenvis {
 extern void clearReflectMask();
 extern void setLightHight(float h);
 void setLight(float x, float y, float z);
+std::tuple<float, float, float> getLightDir();
 void initialize();
 void finalize();
 void new_frame();
@@ -38,5 +39,5 @@ void set_smooth_shading(bool smooth);
 void set_normal_check(bool check);
 void set_render_wireframe(bool render_wireframe);
 unsigned int setup_env_map(std::string name);
-
+std::string get_env_map_name();
 }

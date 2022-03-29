@@ -13,6 +13,7 @@ status = {
     'show_grid': True,
     'playing': True,
     'target_frame': 0,
+    'camera_keyframes': {},
 }
 
 camera_keyframe = None

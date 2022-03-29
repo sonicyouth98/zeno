@@ -326,6 +326,11 @@ class NodeEditor(QWidget):
         prog['views'] = views
         prog['descs'] = dict(self.descs)
         prog['version'] = CURR_VERSION
+        prog['viewport'] = {
+            'light_dir': zenvis.core.getLightDir(),
+            'env_tex_name': zenvis.core.get_env_map_name(),
+            'camera_record': zenvis.status['camera_keyframes'],
+        }
         return prog
 
     def bkwdCompatProgram(self, prog):
@@ -399,6 +404,13 @@ class NodeEditor(QWidget):
             self.scene.record()
         self.initDescriptors()
         self.switchScene('main')
+        if 'viewport' in prog:
+            s = prog['viewport']
+            zenvis.core.setLight(*s['light_dir'])
+            if s['env_tex_name'] != '':
+                zenvis.core.setup_env_map(s['env_tex_name'])
+            for k, v in s['camera_record'].items():
+                zenvis.status['camera_keyframes'][int(k)] = v
 
     def on_execute(self):
         nframes = int(self.edit_nframes.text())

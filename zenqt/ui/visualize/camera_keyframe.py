@@ -18,8 +18,7 @@ class CameraKeyframeWidget(QWidget):
         self.setGeometry(300, 300, 500, 400)
         self.setWindowTitle('Camera Keyframe')
 
-        self.keyframes = {
-        }
+        self.keyframes = zenvis.status['camera_keyframes']
 
         self.list = QListWidget()
 

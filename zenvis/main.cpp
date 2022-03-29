@@ -147,6 +147,9 @@ void setLight(float x, float y, float z)
 {
   light = glm::vec3(x,y,z);
 }
+std::tuple<float, float, float> getLightDir() {
+  return std::tuple<float, float, float>(light.x, light.y, light.z);
+}
 std::unique_ptr<IGraphic> makeGraphicGrid();
 std::unique_ptr<IGraphic> makeGraphicAxis();
 void initialize() {
